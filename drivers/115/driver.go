@@ -166,6 +166,7 @@ func (d *Pan115) Remove(ctx context.Context, obj model.Obj) error {
 	}
 	return d.client.Delete(obj.GetID())
 }
+
 func (d *Pan115) UploadAvailable() (bool, error) {
 	return d.client.UploadAvailable()
 }
