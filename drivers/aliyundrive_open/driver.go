@@ -318,17 +318,6 @@ func (d *AliyundriveOpen) Other(ctx context.Context, args model.OtherArgs) (inte
 		return nil, err
 	}
 
-	if args.Data == "preview" {
-		url, _ := d.getDownloadUrl(args.Obj.GetID())
-		if url != "" {
-			resp.PlayInfo.Videos = append(resp.PlayInfo.Videos, LiveTranscoding{
-				TemplateId: "原画",
-				Status:     "finished",
-				Url:        url,
-			})
-		}
-	}
-
 	return resp, nil
 }
 

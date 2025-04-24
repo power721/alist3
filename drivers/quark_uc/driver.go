@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"github.com/alist-org/alist/v3/internal/conf"
+	"hash"
 	"io"
 	"net/http"
 	"time"

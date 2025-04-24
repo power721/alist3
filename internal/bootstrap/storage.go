@@ -21,7 +21,7 @@ func LoadStorages() {
 		for i := range storages {
 			err := op.LoadStorage(context.Background(), storages[i])
 			if err != nil {
-				utils.Log.Errorf("failed get enabled storages: %+v", err)
+				log.Errorf("failed get enabled storages: %+v", err)
 			} else {
 				log.Infof("[%d] success load storage: [%s], driver: [%s]",
 					i+1, storages[i].MountPath, storages[i].Driver)

@@ -8,10 +8,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,7 +22,6 @@ import (
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/setting"
-	"github.com/alist-org/alist/v3/internal/token"
 	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -30,7 +29,6 @@ import (
 	cipher "github.com/SheltonZhu/115driver/pkg/crypto/ec115"
 	crypto "github.com/SheltonZhu/115driver/pkg/crypto/m115"
 	driver115 "github.com/SheltonZhu/115driver/pkg/driver"
-	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/pkg/errors"
 )
 
@@ -73,7 +71,7 @@ func (d *Pan115) createTempDir(ctx context.Context) {
 	}
 	var clean = false
 	name := "xiaoya-tvbox-temp"
-	_ = d.MakeDir(ctx, dir, name)
+	_, _ = d.MakeDir(ctx, dir, name)
 	files, _ := d.getFiles(root)
 	for _, file := range files {
 		if file.Name == name {
@@ -225,7 +223,7 @@ func (c *Pan115) GenerateToken(fileID, preID, timeStamp, fileSize, signKey, sign
 	return hex.EncodeToString(tokenMd5[:])
 }
 
-func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID string, stream model.FileStreamer) (*driver115.UploadInitResp, error) {
+func (d *Pan115) RapidUpload(fileSize int64, fileName, dirID, preID, fileID string, stream model.FileStreamer) (*driver115.UploadInitResp, error) {
 	var (
 		ecdhCipher   *cipher.EcdhCipher
 		encrypted    []byte
@@ -244,7 +242,7 @@ func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID stri
 	userID := strconv.FormatInt(d.client.UserID, 10)
 	form := url.Values{}
 	form.Set("appid", "0")
-	form.Set("appversion", d.getAppVer())
+	form.Set("appversion", appVer)
 	form.Set("userid", userID)
 	form.Set("filename", fileName)
 	form.Set("filesize", fileSizeStr)
@@ -308,13 +306,6 @@ func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID stri
 	}
 
 	return &result, nil
-}
-
-func (c *Pan115) GenerateToken(fileID, preID, timeStamp, fileSize, signKey, signVal string) string {
-	userID := strconv.FormatInt(c.client.UserID, 10)
-	userIDMd5 := md5.Sum([]byte(userID))
-	tokenMd5 := md5.Sum([]byte(md5Salt + fileID + fileSize + signKey + signVal + userID + timeStamp + hex.EncodeToString(userIDMd5[:]) + appVer))
-	return hex.EncodeToString(tokenMd5[:])
 }
 
 func UploadDigestRange(stream model.FileStreamer, rangeSpec string) (result string, err error) {
