@@ -9,6 +9,8 @@ const (
 )
 
 const (
+	UA115Browser = "Mozilla/5.0 115Browser/27.0.3.7"
+	UserAgent    = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 	// site
 	VERSION      = "version"
 	SiteTitle    = "site_title"
@@ -70,8 +72,16 @@ const (
 	ThunderTempDir = "thunder_temp_dir"
 
 	// single
-	Token         = "token"
-	IndexProgress = "index_progress"
+	Token           = "token"
+	IndexProgress   = "index_progress"
+	DeleteDelayTime = "delete_delay_time"
+	ExternalPort    = "external_port"
+	QUARK           = "QUARK"
+	UC              = "UC"
+	PAN115          = "PAN115"
+	OPEN115         = "OPEN115"
+	PAN139          = "PAN139"
+	AliTo115        = "ali_to_115"
 
 	// SSO
 	SSOClientId          = "sso_client_id"
@@ -144,4 +154,13 @@ const (
 // ContextKey is the type of context keys.
 const (
 	NoTaskKey = "no_task"
+)
+
+const (
+	AliThreads     = 4
+	AliChunkSize   = 512
+	UcThreads      = 8
+	UcChunkSize    = 1024
+	QuarkThreads   = 10
+	QuarkChunkSize = 1024
 )

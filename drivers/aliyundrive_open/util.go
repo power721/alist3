@@ -5,7 +5,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/alist-org/alist/v3/internal/setting"
+	"github.com/alist-org/alist/v3/internal/token"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,11 +23,23 @@ import (
 
 // do others that not defined in Driver interface
 
-func (d *AliyundriveOpen) _refreshToken() (string, string, error) {
-	url := API_URL + "/oauth/access_token"
+func (d *AliyundriveOpen) _refreshToken(force bool) (string, string, error) {
+	accountId := strconv.Itoa(d.AccountId)
+	accessTokenOpen := token.GetToken("AccessTokenOpen-"+accountId, 7200)
+	refreshTokenOpen := token.GetToken("RefreshTokenOpen-"+accountId, 0)
+	log.Debugf("accountID %v accessTokenOpen %v refreshTokenOpen: %v", accountId, accessTokenOpen, refreshTokenOpen)
+	if !force && accessTokenOpen != "" && refreshTokenOpen != "" {
+		d.RefreshToken, d.AccessToken = refreshTokenOpen, accessTokenOpen
+		log.Println("RefreshTokenOpen已经存在")
+		return refreshTokenOpen, accessTokenOpen, nil
+	}
+
+	t := time.Now()
+	url := setting.GetStr("open_token_url", d.base+"/oauth/access_token")
 	if d.OauthTokenURL != "" && d.ClientID == "" {
 		url = d.OauthTokenURL
 	}
+	log.Println("refreshOpenToken", url)
 	//var resp base.TokenResp
 	var e ErrResp
 	res, err := base.RestyClient.R().
@@ -59,6 +75,7 @@ func (d *AliyundriveOpen) _refreshToken() (string, string, error) {
 	if curSub != newSub {
 		return "", "", errors.New("failed to refresh token: sub not match")
 	}
+	d.SaveOpenToken(t)
 	return refresh, access, nil
 }
 
@@ -74,26 +91,50 @@ func getSub(token string) (string, error) {
 	return utils.Json.Get(bs, "sub").ToString(), nil
 }
 
-func (d *AliyundriveOpen) refreshToken() error {
-	if d.ref != nil {
-		return d.ref.refreshToken()
-	}
-	refresh, access, err := d._refreshToken()
+func (d *AliyundriveOpen) refreshToken(force bool) error {
+	refresh, access, err := d._refreshToken(force)
 	for i := 0; i < 3; i++ {
 		if err == nil {
 			break
 		} else {
 			log.Errorf("[ali_open] failed to refresh token: %s", err)
 		}
-		refresh, access, err = d._refreshToken()
+		refresh, access, err = d._refreshToken(force)
 	}
 	if err != nil {
 		return err
 	}
-	log.Infof("[ali_open] token exchange: %s -> %s", d.RefreshToken, refresh)
+	log.Debugf("[ali_open] token exchange: %s -> %s", d.RefreshToken, refresh)
 	d.RefreshToken, d.AccessToken = refresh, access
 	op.MustSaveDriverStorage(d)
 	return nil
+}
+
+func (d *AliyundriveOpen) SaveOpenToken(t time.Time) {
+	accountId := strconv.Itoa(d.AccountId)
+	item := &model.Token{
+		Key:       "AccessTokenOpen-" + accountId,
+		Value:     d.AccessToken,
+		AccountId: d.AccountId,
+		Modified:  t,
+	}
+
+	err := token.SaveToken(item)
+	if err != nil {
+		log.Warnf("save AccessTokenOpen failed: %v", err)
+	}
+
+	item = &model.Token{
+		Key:       "RefreshTokenOpen-" + accountId,
+		Value:     d.RefreshToken,
+		AccountId: d.AccountId,
+		Modified:  t,
+	}
+
+	err = token.SaveToken(item)
+	if err != nil {
+		log.Warnf("save RefreshTokenOpen failed: %v", err)
+	}
 }
 
 func (d *AliyundriveOpen) request(uri, method string, callback base.ReqCallback, retry ...bool) ([]byte, error) {
@@ -122,8 +163,8 @@ func (d *AliyundriveOpen) requestReturnErrResp(uri, method string, callback base
 	}
 	isRetry := len(retry) > 0 && retry[0]
 	if e.Code != "" {
-		if !isRetry && (utils.SliceContains([]string{"AccessTokenInvalid", "AccessTokenExpired", "I400JD"}, e.Code) || d.getAccessToken() == "") {
-			err = d.refreshToken()
+		if !isRetry && (utils.SliceContains([]string{"AccessTokenInvalid", "AccessTokenExpired", "I400JD"}, e.Code) || d.AccessToken == "") {
+			err = d.refreshToken(true)
 			if err != nil {
 				return nil, err, nil
 			}
@@ -132,6 +173,24 @@ func (d *AliyundriveOpen) requestReturnErrResp(uri, method string, callback base
 		return nil, fmt.Errorf("%s:%s", e.Code, e.Message), &e
 	}
 	return res.Body(), nil, nil
+}
+
+func (d *AliyundriveOpen) getDownloadUrl(fileId string) (string, error) {
+	res, err := d.request("/adrive/v1.0/openFile/getDownloadUrl", http.MethodPost, func(req *resty.Request) {
+		req.SetBody(base.Json{
+			"drive_id":   d.DriveId,
+			"file_id":    fileId,
+			"expire_sec": 14400,
+		})
+	})
+	if err != nil {
+		return "", err
+	}
+	url := utils.Json.Get(res, "url").ToString()
+	if url == "" {
+		url = utils.Json.Get(res, "streamsUrl", d.LIVPDownloadFormat).ToString()
+	}
+	return url, nil
 }
 
 func (d *AliyundriveOpen) list(ctx context.Context, data base.Json) (*Files, error) {

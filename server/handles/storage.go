@@ -32,6 +32,25 @@ func ListStorages(c *gin.Context) {
 	})
 }
 
+func GetFailedStorages(c *gin.Context) {
+	var req model.PageReq
+	if err := c.ShouldBind(&req); err != nil {
+		common.ErrorResp(c, err, 400)
+		return
+	}
+	req.Validate()
+	log.Debugf("%+v", req)
+	storages, total, err := db.GetFailedStorages(req.Page, req.PerPage)
+	if err != nil {
+		common.ErrorResp(c, err, 500)
+		return
+	}
+	common.SuccessResp(c, common.PageResp{
+		Content: storages,
+		Total:   total,
+	})
+}
+
 func CreateStorage(c *gin.Context) {
 	var req model.Storage
 	if err := c.ShouldBind(&req); err != nil {
@@ -98,6 +117,20 @@ func EnableStorage(c *gin.Context) {
 		return
 	}
 	if err := op.EnableStorage(c, uint(id)); err != nil {
+		common.ErrorResp(c, err, 500, true)
+		return
+	}
+	common.SuccessResp(c)
+}
+
+func ReloadStorage(c *gin.Context) {
+	idStr := c.Query("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		common.ErrorResp(c, err, 400)
+		return
+	}
+	if err := op.ReloadStorage(c, uint(id)); err != nil {
 		common.ErrorResp(c, err, 500, true)
 		return
 	}

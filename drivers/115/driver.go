@@ -2,6 +2,8 @@ package _115
 
 import (
 	"context"
+	"github.com/alist-org/alist/v3/internal/conf"
+	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 
@@ -13,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/time/rate"
 )
+
+var TempDirId = "0"
 
 type Pan115 struct {
 	model.Storage
@@ -26,6 +30,10 @@ func (d *Pan115) Config() driver.Config {
 	return config
 }
 
+func (d *Pan115) GetClient() *driver115.Pan115Client {
+	return d.client
+}
+
 func (d *Pan115) GetAddition() driver.Additional {
 	return &d.Addition
 }
@@ -35,7 +43,12 @@ func (d *Pan115) Init(ctx context.Context) error {
 	if d.LimitRate > 0 {
 		d.limiter = rate.NewLimiter(rate.Limit(d.LimitRate), 1)
 	}
-	return d.login()
+	err := d.login()
+	if err != nil {
+		return err
+	}
+	d.createTempDir(ctx)
+	return nil
 }
 
 func (d *Pan115) WaitLimit(ctx context.Context) error {
@@ -66,7 +79,11 @@ func (d *Pan115) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 	if err := d.WaitLimit(ctx); err != nil {
 		return nil, err
 	}
-	userAgent := args.Header.Get("User-Agent")
+	var userAgent = args.Header.Get("User-Agent")
+	if userAgent == "" {
+		userAgent = conf.UA115Browser
+	}
+
 	downloadInfo, err := d.
 		DownloadWithUA(file.(*FileObj).PickCode, userAgent)
 	if err != nil {
@@ -76,6 +93,7 @@ func (d *Pan115) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 		URL:    downloadInfo.Url.Url,
 		Header: downloadInfo.Header,
 	}
+	log.Debugf("Link: %v", link)
 	return link, nil
 }
 
@@ -147,6 +165,9 @@ func (d *Pan115) Remove(ctx context.Context, obj model.Obj) error {
 		return err
 	}
 	return d.client.Delete(obj.GetID())
+}
+func (d *Pan115) UploadAvailable() (bool, error) {
+	return d.client.UploadAvailable()
 }
 
 func (d *Pan115) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {

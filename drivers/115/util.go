@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,6 +21,8 @@ import (
 	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/alist-org/alist/v3/internal/setting"
+	"github.com/alist-org/alist/v3/internal/token"
 	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
@@ -27,6 +30,7 @@ import (
 	cipher "github.com/SheltonZhu/115driver/pkg/crypto/ec115"
 	crypto "github.com/SheltonZhu/115driver/pkg/crypto/m115"
 	driver115 "github.com/SheltonZhu/115driver/pkg/driver"
+	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/pkg/errors"
 )
 
@@ -59,6 +63,58 @@ func (d *Pan115) login() error {
 		return errors.New("missing cookie or qrcode account")
 	}
 	return d.client.LoginCheck()
+}
+
+func (d *Pan115) createTempDir(ctx context.Context) {
+	root := d.Addition.RootID.RootFolderID
+	TempDirId = root
+	dir := &model.Object{
+		ID: root,
+	}
+	var clean = false
+	name := "xiaoya-tvbox-temp"
+	_ = d.MakeDir(ctx, dir, name)
+	files, _ := d.getFiles(root)
+	for _, file := range files {
+		if file.Name == name {
+			TempDirId = file.FileID
+			clean = true
+			break
+		}
+	}
+	log.Infof("115 temp folder id: %v", TempDirId)
+	if clean {
+		d.cleanTempDir()
+	}
+}
+
+func (d *Pan115) cleanTempDir() {
+	files, _ := d.getFiles(TempDirId)
+	for _, file := range files {
+		log.Infof("删除115文件: %v %v 创建于 %v", file.GetName(), file.GetID(), file.CreateTime().Local())
+		d.client.Delete(file.GetID())
+		d.DeleteFile(file.Sha1)
+	}
+}
+
+func (d *Pan115) DeleteTempFile(fullHash string) {
+	files, _ := d.getFiles(TempDirId)
+	for _, file := range files {
+		if file.Sha1 == fullHash {
+			log.Infof("删除115文件: %v %v 创建于 %v", file.GetName(), file.GetID(), file.CreateTime().Local())
+			d.client.Delete(file.GetID())
+			d.DeleteFile(file.Sha1)
+		}
+	}
+}
+
+func (d *Pan115) DeleteFile(id string) error {
+	code := setting.GetStr("delete_code_115")
+	if code == "" {
+		return nil
+	}
+
+	return d.client.CleanRecycleBin(code, id)
 }
 
 func (d *Pan115) getFiles(fileId string) ([]FileObj, error) {
@@ -188,7 +244,7 @@ func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID stri
 	userID := strconv.FormatInt(d.client.UserID, 10)
 	form := url.Values{}
 	form.Set("appid", "0")
-	form.Set("appversion", appVer)
+	form.Set("appversion", d.getAppVer())
 	form.Set("userid", userID)
 	form.Set("filename", fileName)
 	form.Set("filesize", fileSizeStr)
@@ -252,6 +308,13 @@ func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID stri
 	}
 
 	return &result, nil
+}
+
+func (c *Pan115) GenerateToken(fileID, preID, timeStamp, fileSize, signKey, signVal string) string {
+	userID := strconv.FormatInt(c.client.UserID, 10)
+	userIDMd5 := md5.Sum([]byte(userID))
+	tokenMd5 := md5.Sum([]byte(md5Salt + fileID + fileSize + signKey + signVal + userID + timeStamp + hex.EncodeToString(userIDMd5[:]) + appVer))
+	return hex.EncodeToString(tokenMd5[:])
 }
 
 func UploadDigestRange(stream model.FileStreamer, rangeSpec string) (result string, err error) {

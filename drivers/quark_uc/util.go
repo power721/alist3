@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/token"
+
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
@@ -27,9 +30,10 @@ func (d *QuarkOrUC) request(pathname string, method string, callback base.ReqCal
 	u := d.conf.api + pathname
 	req := base.RestyClient.R()
 	req.SetHeaders(map[string]string{
-		"Cookie":  d.Cookie,
-		"Accept":  "application/json, text/plain, */*",
-		"Referer": d.conf.referer,
+		"Cookie":     d.Cookie,
+		"Accept":     "application/json, text/plain, */*",
+		"User-Agent": d.conf.ua,
+		"Referer":    d.conf.referer,
 	})
 	req.SetQueryParam("pr", d.conf.pr)
 	req.SetQueryParam("fr", "pc")
@@ -47,13 +51,23 @@ func (d *QuarkOrUC) request(pathname string, method string, callback base.ReqCal
 	}
 	__puus := cookie.GetCookie(res.Cookies(), "__puus")
 	if __puus != nil {
-		d.Cookie = cookie.SetStr(d.Cookie, "__puus", __puus.Value)
-		op.MustSaveDriverStorage(d)
+		d.SaveCookie(__puus.Value)
 	}
 	if e.Status >= 400 || e.Code != 0 {
 		return nil, errors.New(e.Message)
 	}
 	return res.Body(), nil
+}
+
+func (d *QuarkOrUC) SaveCookie(puus string) {
+	var key = conf.QUARK
+	if d.config.Name == "UC" {
+		key = conf.UC
+	}
+	d.Cookie = cookie.SetStr(d.Cookie, "__puus", puus)
+	log.Infof("update %v cookie: %v", key, puus)
+	op.MustSaveDriverStorage(d)
+	token.SaveAccountToken(key, d.Cookie, int(d.ID))
 }
 
 func (d *QuarkOrUC) GetFiles(parent string) ([]File, error) {

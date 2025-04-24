@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/setting"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -21,6 +23,7 @@ import (
 type AliyundriveOpen struct {
 	model.Storage
 	Addition
+	base string
 
 	DriveId string
 
@@ -44,11 +47,18 @@ func (d *AliyundriveOpen) Init(ctx context.Context) error {
 	if d.DriveType == "" {
 		d.DriveType = "default"
 	}
+
+	d.ClientID = setting.GetStr("open_api_client_id")
+	d.ClientSecret = setting.GetStr("open_api_client_secret")
+
 	res, err := d.request("/adrive/v1.0/user/getDriveInfo", http.MethodPost, nil)
 	if err != nil {
 		return err
 	}
 	d.DriveId = utils.Json.Get(res, d.DriveType+"_drive_id").ToString()
+	if d.DriveId == "" {
+		d.DriveId = utils.Json.Get(res, "default_drive_id").ToString()
+	}
 	d.limitList = rateg.LimitFnCtx(d.list, rateg.LimitFnOption{
 		Limit:  4,
 		Bucket: 1,
@@ -125,10 +135,16 @@ func (d *AliyundriveOpen) link(ctx context.Context, file model.Obj) (*model.Link
 		}
 		url = utils.Json.Get(res, "streamsUrl", d.LIVPDownloadFormat).ToString()
 	}
-	exp := time.Minute
+	exp := 895 * time.Second
 	return &model.Link{
 		URL:        url,
 		Expiration: &exp,
+		Header: http.Header{
+			"Referer":    []string{"https://www.alipan.com/"},
+			"User-Agent": []string{conf.UserAgent},
+		},
+		Concurrency: conf.AliThreads,
+		PartSize:    conf.AliChunkSize * utils.KB,
 	}, nil
 }
 
@@ -301,6 +317,18 @@ func (d *AliyundriveOpen) Other(ctx context.Context, args model.OtherArgs) (inte
 	if err != nil {
 		return nil, err
 	}
+
+	if args.Data == "preview" {
+		url, _ := d.getDownloadUrl(args.Obj.GetID())
+		if url != "" {
+			resp.PlayInfo.Videos = append(resp.PlayInfo.Videos, LiveTranscoding{
+				TemplateId: "原画",
+				Status:     "finished",
+				Url:        url,
+			})
+		}
+	}
+
 	return resp, nil
 }
 
