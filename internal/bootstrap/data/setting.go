@@ -222,6 +222,16 @@ func InitialSettings() []model.SettingItem {
 		{Key: conf.StreamMaxClientUploadSpeed, Value: "-1", Type: conf.TypeNumber, Group: model.TRAFFIC, Flag: model.PRIVATE},
 		{Key: conf.StreamMaxServerDownloadSpeed, Value: "-1", Type: conf.TypeNumber, Group: model.TRAFFIC, Flag: model.PRIVATE},
 		{Key: conf.StreamMaxServerUploadSpeed, Value: "-1", Type: conf.TypeNumber, Group: model.TRAFFIC, Flag: model.PRIVATE},
+
+		// customized settings
+		{Key: conf.DeleteDelayTime, Value: "900", Type: conf.TypeNumber, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: conf.ExternalPort, Value: "5344", Type: conf.TypeNumber, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: conf.AliTo115, Value: "false", Type: conf.TypeBool, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: "open_token_url", Value: "https://api.xhofe.top/alist/ali_open/token", Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: "open_api_client_id", Value: "", Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: "open_api_client_secret", Value: "", Type: conf.TypeString, Group: model.SINGLE, Flag: model.PRIVATE},
+		{Key: "ali_account_id", Value: "0", Type: conf.TypeNumber, Group: model.SINGLE, Flag: model.PRIVATE},
+
 	}
 	initialSettingItems = append(initialSettingItems, tool.Tools.Items()...)
 	if flags.Dev {
