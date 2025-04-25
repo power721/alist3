@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"github.com/alist-org/alist/v3/internal/setting"
 	"net/http"
 	stdpath "path"
 	"strings"
@@ -19,9 +20,13 @@ func GetApiUrl(r *http.Request) string {
 		if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 			protocol = "https"
 		}
-		host := r.Header.Get("X-Forwarded-Host")
-		if host == "" {
-			host = r.Host
+		host := r.Host
+		if r.Header.Get("X-Forwarded-Host") != "" {
+			port := setting.GetStr(conf.ExternalPort, "5344")
+			host = r.Header.Get("X-Forwarded-Host")
+			if !strings.Contains(host, ":") {
+				host = host + ":" + port
+			}
 		}
 		api = fmt.Sprintf("%s://%s", protocol, stdpath.Join(host, api))
 	}
