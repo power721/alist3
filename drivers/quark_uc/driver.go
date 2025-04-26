@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"github.com/alist-org/alist/v3/internal/conf"
 	"hash"
 	"io"
 	"net/http"
@@ -66,16 +67,25 @@ func (d *QuarkOrUC) Link(ctx context.Context, file model.Obj, args model.LinkArg
 	if err != nil {
 		return nil, err
 	}
+	log.Debugf("Link: %v %v", file.GetID(), resp)
+
+	threads := conf.QuarkThreads
+	chunkSize := conf.QuarkChunkSize
+
+	if d.config.Name == "UC" {
+		threads = conf.UcThreads
+		chunkSize = conf.UcChunkSize
+	}
 
 	return &model.Link{
 		URL: resp.Data[0].DownloadUrl,
 		Header: http.Header{
 			"Cookie":     []string{d.Cookie},
 			"Referer":    []string{d.conf.referer},
-			"User-Agent": []string{ua},
+			"User-Agent": []string{d.conf.ua},
 		},
-		Concurrency: 3,
-		PartSize:    10 * utils.MB,
+		Concurrency: threads,
+		PartSize:    chunkSize * utils.KB,
 	}, nil
 }
 

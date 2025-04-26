@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/alist-org/alist/v3/internal/op"
 	"net/http"
 	"net/url"
 	"sync"
@@ -37,9 +38,11 @@ func (d *Pan123Share) GetAddition() driver.Additional {
 }
 
 func (d *Pan123Share) Init(ctx context.Context) error {
-	// TODO login / refresh token
-	//op.MustSaveDriverStorage(d)
-	return nil
+	pan123 := op.GetFirstDriver("123Pan")
+	if pan123 != nil {
+		return d.InitReference(pan123)
+	}
+	return fmt.Errorf("cannot find 123Pan")
 }
 
 func (d *Pan123Share) InitReference(storage driver.Driver) error {
@@ -79,11 +82,13 @@ func (d *Pan123Share) Link(ctx context.Context, file model.Obj, args model.LinkA
 			}
 		}
 		data := base.Json{
+			"driveId":   "0",
 			"shareKey":  d.ShareKey,
 			"SharePwd":  d.SharePwd,
 			"etag":      f.Etag,
 			"fileId":    f.FileId,
 			"s3keyFlag": f.S3KeyFlag,
+			"FileName":  f.FileName,
 			"size":      f.Size,
 		}
 		resp, err := d.request(DownloadInfo, http.MethodPost, func(req *resty.Request) {
@@ -165,7 +170,7 @@ func (d *Pan123Share) Put(ctx context.Context, dstDir model.Obj, stream model.Fi
 
 func (d *Pan123Share) APIRateLimit(ctx context.Context, api string) error {
 	value, _ := d.apiRateLimit.LoadOrStore(api,
-		rate.NewLimiter(rate.Every(700*time.Millisecond), 1))
+		rate.NewLimiter(rate.Every(800*time.Millisecond), 1))
 	limiter := value.(*rate.Limiter)
 
 	return limiter.Wait(ctx)

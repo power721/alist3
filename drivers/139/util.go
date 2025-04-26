@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/token"
+
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
@@ -100,6 +103,7 @@ func (d *Yun139) refreshToken() error {
 		return fmt.Errorf("failed to refresh token: %s", resp.Desc)
 	}
 	d.Authorization = base64.StdEncoding.EncodeToString([]byte(splits[0] + ":" + splits[1] + ":" + resp.Token))
+	token.SaveAccountToken(conf.PAN139, d.Authorization, int(d.ID))
 	op.MustSaveDriverStorage(d)
 	return nil
 }

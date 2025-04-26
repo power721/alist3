@@ -1,0 +1,14 @@
+FROM haroldli/alist-builder as builder
+LABEL stage=go-builder
+WORKDIR /app/
+COPY ./ ./
+ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+RUN bash build.sh release docker
+
+FROM xiaoyaliu/alist:hostmode
+
+LABEL MAINTAINER="Har01d"
+
+RUN apk add --no-cache wget
+
+COPY --from=builder /app/bin/alist ./

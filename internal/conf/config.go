@@ -102,6 +102,7 @@ type Config struct {
 	Database              Database    `json:"database" envPrefix:"DB_"`
 	Meilisearch           Meilisearch `json:"meilisearch" envPrefix:"MEILISEARCH_"`
 	Scheme                Scheme      `json:"scheme"`
+	OpenTokenAuthUrl      string      `json:"opentoken_auth_url"`
 	TempDir               string      `json:"temp_dir" env:"TEMP_DIR"`
 	BleveDir              string      `json:"bleve_dir" env:"BLEVE_DIR"`
 	DistDir               string      `json:"dist_dir"`
@@ -142,6 +143,7 @@ func DefaultConfig() *Config {
 			TablePrefix: "x_",
 			DBFile:      dbPath,
 		},
+		OpenTokenAuthUrl: "https://api.xhofe.top/alist/ali_open/token",
 		Meilisearch: Meilisearch{
 			Host: "http://localhost:7700",
 		},
