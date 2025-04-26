@@ -26,6 +26,10 @@ import (
 
 // do others that not defined in Driver interface
 
+func (d *QuarkOrUC) Request(pathname string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
+	return d.request(pathname, method, callback, resp)
+}
+
 func (d *QuarkOrUC) request(pathname string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	u := d.conf.api + pathname
 	req := base.RestyClient.R()
@@ -51,12 +55,17 @@ func (d *QuarkOrUC) request(pathname string, method string, callback base.ReqCal
 	}
 	__puus := cookie.GetCookie(res.Cookies(), "__puus")
 	if __puus != nil {
+		log.Debugf("update __puus: %v", __puus)
 		d.Cookie = cookie.SetStr(d.Cookie, "__puus", __puus.Value)
 		d.SaveCookie(d.Cookie)
 	} else {
 		c := res.Request.Header.Get("Cookie")
-		if c != d.Cookie && strings.Contains(c, "__puus") {
-			d.SaveCookie(c)
+		v1 := cookie.GetStr(d.Cookie, "__puus")
+		v2 := cookie.GetStr(c, "__puus")
+		if v2 != "" && v1 != v2 {
+			d.Cookie = cookie.SetStr(d.Cookie, "__puus", v2)
+			log.Debugf("update cookie: %v %v %v", d.Cookie, v1, v2)
+			d.SaveCookie(d.Cookie)
 		}
 	}
 	if e.Status >= 400 || e.Code != 0 {
